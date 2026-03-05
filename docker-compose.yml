@@ -1,0 +1,24 @@
+services:
+
+  mongo:
+    image: mongo:7
+    container_name: coupon-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  server:
+    build: ./server
+    container_name: coupon-server
+    ports:
+      - "5000:5000"
+    environment:
+      PORT: 5000
+      RESELLER_TOKEN: dev-token-123
+      MONGO_URI: mongodb://mongo:27017/coupon_marketplace
+    depends_on:
+      - mongo
+
+volumes:
+  mongo_data:
