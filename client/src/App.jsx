@@ -1,142 +1,17 @@
 import "./App.css";
 import { useEffect, useState } from "react";
+import Header from "./components/Header";
+import Hero from "./components/Hero";
+import CouponCard from "./components/CouponCard";
+import Highlights from "./components/Highlights";
+import Footer from "./components/Footer";
 
 const API_BASE = "http://localhost:5000";
-
-function Header() {
-  return (
-    <header className="header">
-      <div className="container headerInner">
-        <div className="logo">Digital Coupon Marketplace</div>
-        <a
-          className="githubBtn"
-          href="https://github.com/MMGoodman/digital-coupon-marketplace"
-          target="_blank"
-          rel="noreferrer"
-        >
-          View GitHub
-        </a>
-      </div>
-    </header>
-  );
-}
-
-function Hero() {
-  return (
-    <section className="hero">
-      <div className="container heroContent">
-        <div className="heroText">
-          <span className="badge">Backend + Frontend Demo</span>
-          <h1>Digital coupons with a clean purchase flow</h1>
-          <p>
-            A simple marketplace demo built with React, Node.js, MongoDB and Docker.
-            Each coupon can be sold only once, with safe server-side purchase logic.
-          </p>
-          <a href="#coupons" className="primaryBtn">
-            View Coupons
-          </a>
-        </div>
-
-        <div className="heroCard">
-          <h3>Project Highlights</h3>
-          <ul>
-            <li>Clean React interface</li>
-            <li>Connected to real backend API</li>
-            <li>MongoDB persistence</li>
-            <li>Atomic purchase protection</li>
-          </ul>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function CouponCard({ coupon, onPurchase, purchasingId }) {
-  const isPurchasing = purchasingId === coupon.id;
-
-  return (
-    <div className="couponCard">
-      <img
-        src={coupon.image_url}
-        alt={coupon.name}
-        className="couponImage"
-      />
-
-      <div className="couponBody">
-        <div className="couponTop">
-          <h3>{coupon.name}</h3>
-          <span className="priceTag">${coupon.price}</span>
-        </div>
-
-        <p>{coupon.description}</p>
-
-        <button
-          className="purchaseBtn"
-          onClick={() => onPurchase(coupon.id)}
-          disabled={isPurchasing}
-        >
-          {isPurchasing ? "Processing..." : "Purchase"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function Highlights() {
-  return (
-    <section className="highlights">
-      <div className="container">
-        <h2>Why this project stands out</h2>
-
-        <div className="highlightsGrid">
-          <div className="highlightCard">
-            <h3>Real API Integration</h3>
-            <p>
-              The frontend fetches available coupons from the backend and updates
-              the UI after purchase.
-            </p>
-          </div>
-
-          <div className="highlightCard">
-            <h3>Safe Purchase Logic</h3>
-            <p>
-              A coupon can only be sold once. The backend uses atomic MongoDB
-              updates to prevent duplicate purchases.
-            </p>
-          </div>
-
-          <div className="highlightCard">
-            <h3>Docker Ready</h3>
-            <p>
-              The backend and MongoDB run with Docker Compose for simple local setup.
-            </p>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function Footer() {
-  return (
-    <footer className="footer">
-      <div className="container footerInner">
-        <p>Built by Moshe Goodman</p>
-        <a
-          href="https://github.com/MMGoodman/digital-coupon-marketplace"
-          target="_blank"
-          rel="noreferrer"
-        >
-          GitHub Repository
-        </a>
-      </div>
-    </footer>
-  );
-}
 
 export default function App() {
   const [coupons, setCoupons] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [creatingDemo, setCreatingDemo] = useState(false);
   const [pageError, setPageError] = useState("");
   const [purchasingId, setPurchasingId] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -144,6 +19,12 @@ export default function App() {
   const resellerHeaders = {
     Authorization: "Bearer dev-token-123",
     "Content-Type": "application/json",
+  };
+
+  const normalizeCoupons = (data) => {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.value)) return data.value;
+    return [];
   };
 
   const fetchCoupons = async () => {
@@ -160,11 +41,52 @@ export default function App() {
       }
 
       const data = await response.json();
-      setCoupons(Array.isArray(data) ? data : data.value || []);
+      const normalizedData = normalizeCoupons(data);
+      setCoupons(normalizedData);
     } catch (error) {
+      console.error("fetchCoupons error:", error);
       setPageError("Could not load coupons. Please make sure the backend is running.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const createDemoCoupon = async () => {
+    try {
+      setCreatingDemo(true);
+      setPageError("");
+      setSuccessMessage("");
+
+      const body = {
+        name: "Amazon $100 Coupon",
+        description: "Gift card",
+        image_url:
+          "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=900&q=80",
+        cost_price: 80,
+        margin_percentage: 25,
+        coupon_value_type: "STRING",
+        coupon_value: "ABCD-1234",
+      };
+
+      const response = await fetch(`${API_BASE}/api/admin/products`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to create demo coupon");
+      }
+
+      setSuccessMessage("Demo coupon created successfully.");
+      await fetchCoupons();
+    } catch (error) {
+      console.error("createDemoCoupon error:", error);
+      setPageError("Could not create a demo coupon.");
+    } finally {
+      setCreatingDemo(false);
     }
   };
 
@@ -189,6 +111,7 @@ export default function App() {
       setSuccessMessage(`Purchase completed successfully. Coupon value: ${data.value}`);
       setCoupons((prev) => prev.filter((item) => item.id !== couponId));
     } catch (error) {
+      console.error("purchase error:", error);
       setPageError(error.message || "Purchase failed");
     } finally {
       setPurchasingId("");
@@ -207,8 +130,22 @@ export default function App() {
       <main className="mainContent" id="coupons">
         <div className="container">
           <div className="sectionTitle">
-            <h2>Available Coupons</h2>
-            <p>Live data from the backend service</p>
+            <div className="titleRow">
+              <div>
+                <h2>Available Coupons</h2>
+                <p>Live data from the backend service</p>
+              </div>
+
+              <div className="actionsRow">
+                <button
+                  className="secondaryBtn"
+                  onClick={createDemoCoupon}
+                  disabled={creatingDemo}
+                >
+                  {creatingDemo ? "Creating..." : "Create Demo Coupon"}
+                </button>
+              </div>
+            </div>
           </div>
 
           {successMessage && <div className="successBox">{successMessage}</div>}
